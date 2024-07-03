@@ -5,6 +5,7 @@ import cheerio from 'cheerio';
 import csvParser from 'csv-parser';
 import { Transform } from 'stream';
 import moment from 'moment';
+import { sendEmail, updateEmailMailgenContent } from './mail.js';
 
 dotenv.config();
 
@@ -15,6 +16,15 @@ const COLLECTION_NAME = 'files-storage';
 let CSV_URL = null;
 
 let cachedClient = null;
+
+function getFormattedDate(d = new Date().toString()) {
+    const date = new Date(d)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, "0")
+    const day = String(date.getDate()).padStart(2, "0")
+
+    return `${year}-${month}-${day}`
+}
 
 async function getMongoClient() {
     if (cachedClient) {
@@ -144,7 +154,84 @@ async function performInsertion() {
     }
 }
 
+async function sendUpdationEmail() {
+    const client = await getMongoClient();
+    try {
+        await client.connect();
+        const db = client.db(MONGODB_DB);
+
+        // Calculate the date range for the previous day
+        function getPreviousDate() {
+            const today = new Date();
+            today.setDate(today.getDate() - 1);
+            return today;
+        }
+        const pastDate = getFormattedDate(getPreviousDate());
+        console.log(`Past date: ${pastDate}`);
+
+        const additionsCollection = db.collection('additions');
+        const updatesCollection = db.collection('updates');
+        const removalsCollection = db.collection('removals');
+
+        const additions = await additionsCollection.find({
+            date: pastDate
+        }).toArray();
+
+        const updates = await updatesCollection.find({
+            date: pastDate
+        }).toArray();
+
+        const removals = await removalsCollection.find({
+            date: pastDate
+        }).toArray();
+
+        const followedEmailsCollection = db.collection('followedemails');
+        const followedEmails = await followedEmailsCollection.find({}).toArray();
+
+        additions.forEach(async (addition) => {
+            followedEmails.forEach(async (followedEmail) => {
+                if (followedEmail.companyName === addition.name) {
+                    await sendEmail({
+                        email: followedEmail.email,
+                        subject: "Addition Email",
+                        mailgenContent: updateEmailMailgenContent('addition', followedEmail.companyName)
+                    });
+                }
+            });
+        });
+
+        updates.forEach(async (update) => {
+            followedEmails.forEach(async (followedEmail) => {
+                if (followedEmail.companyName === update.name) {
+                    await sendEmail({
+                        email: followedEmail.email,
+                        subject: "Updation Email",
+                        mailgenContent: updateEmailMailgenContent('updation', followedEmail.companyName)
+                    });
+                }
+            });
+        });
+
+        removals.forEach(async (removal) => {
+            followedEmails.forEach(async (followedEmail) => {
+                if (followedEmail.companyName === removal.name) {
+                    await sendEmail({
+                        email: followedEmail.email,
+                        subject: "Removal Email",
+                        mailgenContent: updateEmailMailgenContent('removals', followedEmail.companyName)
+                    });
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error in sending email:', error);
+    } finally {
+        await client.close();
+    }
+}
+
 export default async function handler() {
     performInsertion();
+    sendUpdationEmail();
     console.log('Data insertion started');
 }
