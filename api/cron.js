@@ -149,7 +149,7 @@ async function performInsertion() {
     } catch (error) {
         console.error('Error inserting data:', error);
     } finally {
-        await client.close();
+        // await client.close();
         console.log('MongoDB connection closed');
     }
 }
@@ -231,7 +231,7 @@ async function sendUpdationEmail() {
 }
 
 export default async function handler() {
-    performInsertion();
+    await performInsertion();
     sendUpdationEmail();
     console.log('Data insertion started');
 }
