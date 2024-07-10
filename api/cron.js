@@ -173,56 +173,83 @@ async function sendUpdationEmail() {
         const updatesCollection = db.collection('updates');
         const removalsCollection = db.collection('removals');
 
+        const additionsSet = new Set();
+        const updatesSet = new Set();
+        const removalsSet = new Set();
+        const companiesSet = new Set();
+
         const additions = await additionsCollection.find({
             date: pastDate
         }).toArray();
+        additions.forEach((addition) => {
+            additionsSet.add(addition.name);
+            companiesSet.add(addition.name);
+        });
 
         const updates = await updatesCollection.find({
             date: pastDate
         }).toArray();
+        updates.forEach((update) => {
+            updatesSet.add(update.name);
+            companiesSet.add(update.name);
+        });
 
         const removals = await removalsCollection.find({
             date: pastDate
         }).toArray();
+        removals.forEach((removal) => {
+            removalsSet.add(removal.name);
+            companiesSet.add(removal.name);
+        });
+
+        const companiesArray = Array.from(companiesSet);
 
         const followedEmailsCollection = db.collection('followedemails');
-        const followedEmails = await followedEmailsCollection.find({}).toArray();
+        const followedEmails = await followedEmailsCollection.find({
+            companyName: { $in: companiesArray }
+        }).toArray();
 
-        additions.forEach(async (addition) => {
+        // additions.forEach(async (addition) => {
             followedEmails.forEach(async (followedEmail) => {
-                if (followedEmail.companyName === addition.name) {
+                // if (followedEmail.companyName === addition.name) {
+                if (additionsSet.has(followedEmail.companyName)) {
                     await sendEmail({
                         email: followedEmail.email,
                         subject: "Addition Email",
                         mailgenContent: updateEmailMailgenContent('addition', followedEmail.companyName)
                     });
                 }
-            });
-        });
 
-        updates.forEach(async (update) => {
-            followedEmails.forEach(async (followedEmail) => {
-                if (followedEmail.companyName === update.name) {
+                if (updatesSet.has(followedEmail.companyName)) {
                     await sendEmail({
                         email: followedEmail.email,
                         subject: "Updation Email",
                         mailgenContent: updateEmailMailgenContent('updation', followedEmail.companyName)
                     });
                 }
-            });
-        });
 
-        removals.forEach(async (removal) => {
-            followedEmails.forEach(async (followedEmail) => {
-                if (followedEmail.companyName === removal.name) {
+                if (removalsSet.has(followedEmail.companyName)) {
                     await sendEmail({
                         email: followedEmail.email,
                         subject: "Removal Email",
                         mailgenContent: updateEmailMailgenContent('removals', followedEmail.companyName)
                     });
                 }
+
             });
-        });
+        // });
+
+        // updates.forEach(async (update) => {
+            // followedEmails.forEach(async (followedEmail) => {
+            //     // if (followedEmail.companyName === update.name) {
+            // });
+        // });
+
+        // removals.forEach(async (removal) => {
+            // followedEmails.forEach(async (followedEmail) => {
+            //     // if (followedEmail.companyName === removal.name) {
+            // });
+        // });
     } catch (error) {
         console.error('Error in sending email:', error);
     } finally {
@@ -233,5 +260,5 @@ async function sendUpdationEmail() {
 export default async function handler() {
     console.log('Data insertion started');
     await performInsertion();
-    // sendUpdationEmail();
+    sendUpdationEmail();
 }
