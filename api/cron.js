@@ -260,5 +260,5 @@ async function sendUpdationEmail() {
 export default async function handler() {
     console.log('Data insertion started');
     await performInsertion();
-    sendUpdationEmail();
+    //sendUpdationEmail();
 }
